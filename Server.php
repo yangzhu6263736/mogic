@@ -10,6 +10,7 @@ class Server
     private $application;
     private $redis;
     public $memtable;
+    public $GID;//group process id集群中每个进程一个单独的id
     public static function getInstance()
     {
         return Server::$_instance;
@@ -33,20 +34,25 @@ class Server
 
     public function creatTable()
     {
-        $this->memtable = new \swoole\table(1024);
-        $this->memtable->column('id', \swoole\table::TYPE_INT, 4);       //1,2,4,8
-        $this->memtable->column('name', \swoole\table::TYPE_STRING, 64);
-        $this->memtable->column('num', \swoole\table::TYPE_FLOAT);
-        $this->memtable->create();
-        $this->memtable->set(1, array(
-            'id'=>1,
-            'name'=>"yangzhu",
-            'num'=>100
-            ));
-        $user = $this->memtable->get(1);
-        print_R($user);
+        // $this->memtable = new \swoole\table(1024);
+        // $this->memtable->column('id', \swoole\table::TYPE_INT, 4);       //1,2,4,8
+        // $this->memtable->column('name', \swoole\table::TYPE_STRING, 64);
+        // $this->memtable->column('num', \swoole\table::TYPE_FLOAT);
+        // $this->memtable->create();
+        // $this->memtable->set(1, array(
+        //     'id'=>1,
+        //     'name'=>"yangzhu",
+        //     'num'=>100
+        //     ));
+        // $user = $this->memtable->get(1);
+        // print_R($user);
         \Mogic\Memo::getInstance()->create();
         \Mogic\Memo::getInstance()->test();
+        \Mogi\Memo::getInstance()->table(MEMO_TABLE_USERS)->SET(100, array(
+            'userId'=>1,
+            'name'  =>'yangzhu',
+            'coin'  =>100,
+        ));
     }
 
     public function sendToFd($fd, $data)
@@ -92,6 +98,7 @@ class Server
             // echo "WorkerStart2=================\n";
 
             // print_r($this->swooleServer);
+            $this->fetchGid();
             var_dump($serv == $this->swooleServer);
             if ($workerId >= $serv->setting['worker_num']) {
                 swoole_set_process_name("php JoySwoole task worker");
@@ -203,10 +210,28 @@ class Server
         });
     }
 
+    /**
+     * 进程获取集群服务id
+     * 同步阻塞的从redis中获取
+     *
+     * @return void
+     */
+    public function fetchGid()
+    {
+        $configs = Config::getConfig('Redis');
+        $config = $config[REDIS_GROUP_MOG];
+        $redis = new Redis();
+        $redis->connect($config['host'], $config['port']);
+        $redis->select($config['dbid']);
+        $this->GID = $redis->incr('MOG_GRUOP_PROCESS_ID', 1);
+    }
+    
+
     public function onWorkerStart()
     {
         \Mogic\MLog::log("on onWorkerStart");
         swoole_set_process_name("php Mogic worker");
+   
         RedisPools::pool(REDIS_GROUP_MOG)->set('key', "fuck", function (\swoole_redis $client, $result) {
             // \Mogic\MLog::log("xxxx", $result);
             $client->get('key', function (\swoole_redis $client, $result) {

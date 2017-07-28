@@ -15,6 +15,10 @@ class Response
 
     // }
 
+    public function sessionStart($session)
+    {
+    }
+
     public function out()
     {
         return $this->di;

@@ -16,3 +16,4 @@
     include_once("Response.php");
     include_once("BaseService.php");
     include_once("Memo.php");
+    include_once("Utils.php");

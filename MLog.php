@@ -6,7 +6,8 @@ class MLog
     public static $workerId = 0;
     public static $processId = 0;
 
-    public static function getEnvParams(){
+    public static function getEnvParams()
+    {
         // self::$workerId = \Mogic\Server::getInstance().
     }
 

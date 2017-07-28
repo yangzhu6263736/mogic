@@ -1,48 +1,112 @@
 <?php
-	namespace Mogic;
-	class Session{
-		private static $_instances;
+/**
+ * MOG的session类
+ *  数据存储交由redis
+ */
+namespace Mogic;
 
-		public $session_id = '';
+class Session
+{
+    private static $_instances;
 
-		public static function getInstance($session_id = ''){
-			if (empty($session_id)) {//如果没有sessionID则从相应对像中取出
-				$session_id = time();//模拟数据
-			}
-			if (empty(self::$_instances[$session_id])) {
-				new Session($session_id);
-			}
-			return self::$_instances[$session_id];
-			echo "xxxxxxsasdfasdf";
-		}
+    public $session_id = '';
+    private $updateTime;
+    private $di;//数据容器
 
-		public function __construct($session_id) {
-			$this->session_id = $session_id;
-			self::$_instances[$session_id] = $this;
-		}
+    /**
+     * 创建一个sessionId
+     * 根据进程id 毫秒时间 和随机数 生成防止重复
+     *
+     * @return void
+     */
+    public static function createSessionId()
+    {
+        $array = array(
+            \Mogic\Server::getInstance()->GID,//当前进程的集群服务号
+            \Mogic\Utils::getMillisecond(),
+            rand(100000, 99999)
+        );
+        return implode('-', $array);
+    }
 
-		public function set($key, $value){
-			$this->$key = $value;
-		}
+    public static function start()
+    {
+        $session_id = self::createSessionId();//模拟数据
+        return self::getSession($session_id);
+    }
 
-		public function get($key) {
-			return $this->$key;
-		}
+    public static function getSession($session_id = '')
+    {
+        if (empty(self::$_instances[$session_id])) {
+            new Session($session_id);
+        }
+        return self::$_instances[$session_id];
+    }
 
-		public function del($key){
-			unset($this->$key);
-		}
+    public function __construct($session_id)
+    {
+        $this->session_id = $session_id;
+        self::$_instances[$session_id] = $this;
+        $GID = \Mogic\Server::getInstance()->GID;
+        list($_GID, $mtime, $rand) = \explode('-', $session_id);
+        if ($GID !== $_GID) {
+            $this->fetch();
+        }
+    }
+    
+    /**
+     * 将数据推送到远端
+     *
+     * @return void
+     */
+    public function pull()
+    {
+        RedisPools::pool(REDIS_GROUP_SESSION)->set($this->session_id, \json_encode($this->di), function (\swoole_redis $client, $result) {
+        });
+    }
 
-		public function clear(){
-			unset(self::$_instances[$this->session_id]);
-		}
+    /**
+     * 从远端恢复数据
+     *
+     * @return void
+     */
+    public function fetch($next)
+    {
+        RedisPools::pool(REDIS_GROUP_SESSION)->get($this->session_id, function (\swoole_redis $client, $result) use ($next) {
+            if ($result !== false) {
+                $this->di = \json_decode($result, true);
+            }
+            if ($next) {
+                call_user_func($next);
+            }
+        });
+    }
 
-		/**
-		 * 持久化到redis中
-		 * @return [type] [description]
-		 */
-		public function keep(){
+    public function __get($name)
+    {
+        return isset($this->di[$name]) ? $this->di[$name] : false;
+    }
 
-		}
-	}
-?>
+    public function __set($name, $value)
+    {
+        $this->di[$name] = $value;
+    }
+
+    public function del($key)
+    {
+        unset($this->di[$name]);
+    }
+
+    public function clear()
+    {
+        unset(self::$_instances[$this->session_id]);
+    }
+
+    /**
+     * 持久化到redis中
+     * @return [type] [description]
+     */
+    public function keep()
+    {
+    }
+}

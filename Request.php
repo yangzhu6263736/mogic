@@ -10,9 +10,13 @@ class Request
     public $params;
     public $response;
     public $callback;
+    public $session_id;
 
     public function __construct($route, $params, $callback)
     {
+        if (!empty($params['session_id'])) {
+            $this->session_id = $params['session_id'];
+        }
         $this->route = $route;
         $this->params = $params;
         $this->callback = $callback;

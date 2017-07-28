@@ -32,6 +32,11 @@ class Client
         });
     }
 
+    public function sessionStart()
+    {
+
+    }
+
     public function getFd()
     {
         return $this->fd;
