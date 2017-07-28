@@ -48,7 +48,7 @@ class Server
         // print_R($user);
         \Mogic\Memo::getInstance()->create();
         \Mogic\Memo::getInstance()->test();
-        \Mogi\Memo::getInstance()->table(MEMO_TABLE_USERS)->SET(100, array(
+        \Mogic\Memo::getInstance()->table(MEMO_TABLE_USERS)->SET(100, array(
             'userId'=>1,
             'name'  =>'yangzhu',
             'coin'  =>100,
@@ -219,8 +219,8 @@ class Server
     public function fetchGid()
     {
         $configs = Config::getConfig('Redis');
-        $config = $config[REDIS_GROUP_MOG];
-        $redis = new Redis();
+        $config = $configs[REDIS_GROUP_MOG];
+        $redis = new \Redis();
         $redis->connect($config['host'], $config['port']);
         $redis->select($config['dbid']);
         $this->GID = $redis->incr('MOG_GRUOP_PROCESS_ID', 1);

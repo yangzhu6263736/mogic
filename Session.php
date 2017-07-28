@@ -47,11 +47,19 @@ class Session
     {
         $this->session_id = $session_id;
         self::$_instances[$session_id] = $this;
+    }
+
+    /**
+     * 是否是本地创建的session
+     * 通过GID判断 如果
+     *
+     * @return boolean
+     */
+    public function isLocal()
+    {
         $GID = \Mogic\Server::getInstance()->GID;
         list($_GID, $mtime, $rand) = \explode('-', $session_id);
-        if ($GID !== $_GID) {
-            $this->fetch();
-        }
+        return $GID !== $_GID;
     }
     
     /**
@@ -72,12 +80,15 @@ class Session
      */
     public function fetch($next)
     {
+        // if ($this->isLocal) {//如果是本地session
+        //     return call_user_func($next, $this);
+        // }
         RedisPools::pool(REDIS_GROUP_SESSION)->get($this->session_id, function (\swoole_redis $client, $result) use ($next) {
             if ($result !== false) {
                 $this->di = \json_decode($result, true);
             }
             if ($next) {
-                call_user_func($next);
+                call_user_func($next, false, $this);
             }
         });
     }
@@ -89,6 +100,7 @@ class Session
 
     public function __set($name, $value)
     {
+        echo "session: __set, $name, $value\n";
         $this->di[$name] = $value;
     }
 

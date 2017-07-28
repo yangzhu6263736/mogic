@@ -34,6 +34,8 @@ class Application
             if (strstr($className, 'Controller')) {
                 $array = explode("\\", $className);
                 $file = APP_PATH.'Module/'.$array[0].'/Controller/'.$array[2].'.php';
+                // \Mogic\MLog::log("spl_autoload_register:", $file);
+
                 if (is_file($file)) {
                     include_once($file);
                 }
@@ -71,9 +73,10 @@ class Application
         $route = "Hall/User/test";
         $_route = "Hall\Controller\Hall";
         // include_once(APP_PATH.'Module/Hall/Controller/User.php');
-        \Mogic\MLog::log("application start 1");
+        \Mogic\MLog::log("application run:", $request->getRouter());
         // print_R($request);
         $err = false;
+
         try {
             call_user_func_array(array($request->getRouter(), $request->action), array($request));
         } catch (Exception $e) {

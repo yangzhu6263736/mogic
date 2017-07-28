@@ -24,7 +24,7 @@ class Request
         $routes = explode('/', $route);
         list($module, $controller, $action) = $routes;
         $this->module = ucfirst($module);
-        $this->controller = ucfirst($module);
+        $this->controller = ucfirst($controller);
         $this->action = ucfirst($action);
     }
 
@@ -49,7 +49,7 @@ class Request
         if ($err) {
             call_user_func($this->callback, $err, $msg);
         } else {
-            call_user_func($this->callback, false, $this->response);
+            call_user_func($this->callback, false, $this->response->out());
         }
     }
 }
