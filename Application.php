@@ -34,8 +34,7 @@ class Application
             if (strstr($className, 'Controller')) {
                 $array = explode("\\", $className);
                 $file = APP_PATH.'Module/'.$array[0].'/Controller/'.$array[2].'.php';
-                // \Mogic\MLog::log("spl_autoload_register:", $file);
-
+                \Mogic\MLog::log("spl_autoload_register:", $file);
                 if (is_file($file)) {
                     include_once($file);
                 }

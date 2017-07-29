@@ -34,18 +34,6 @@ class Server
 
     public function creatTable()
     {
-        // $this->memtable = new \swoole\table(1024);
-        // $this->memtable->column('id', \swoole\table::TYPE_INT, 4);       //1,2,4,8
-        // $this->memtable->column('name', \swoole\table::TYPE_STRING, 64);
-        // $this->memtable->column('num', \swoole\table::TYPE_FLOAT);
-        // $this->memtable->create();
-        // $this->memtable->set(1, array(
-        //     'id'=>1,
-        //     'name'=>"yangzhu",
-        //     'num'=>100
-        //     ));
-        // $user = $this->memtable->get(1);
-        // print_R($user);
         \Mogic\Memo::getInstance()->create();
         \Mogic\Memo::getInstance()->test();
         \Mogic\Memo::getInstance()->table(MEMO_TABLE_USERS)->SET(100, array(
@@ -63,11 +51,13 @@ class Server
 
     public function sendToUser($userId, $data)
     {
-        $client = Client::getClientByUserId($userId);
-        if (!$clientId) {
-            return false;
+        $this->userId = $userId;
+        $fd = \Mogic\Memo::getInstance()->table(MEMO_TABLE_USER_FD)->GET($userId);
+        if (!$fd) {
+            #@todo '分布式rpc'
+            return;
         }
-        $this->pushToFd($client->getFd(), $data);
+        $this->pushToFd($fd, $data);
     }
 
     public function initSwooleServer()

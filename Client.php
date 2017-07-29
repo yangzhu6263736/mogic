@@ -7,11 +7,24 @@ class Client
 {
     private static $_instances;
     public $fd;
+    public $userId;
     public $session;
     public static function getClient($fd)
     {
         if (empty(self::$_instances[$fd])) {
-            new Client($fd);
+            return false;
+        }
+        return self::$_instances[$fd];
+    }
+
+    public static function getClientByUserId($userId)
+    {
+        $fd = \Mogic\Memo::getInstance()->table(MEMO_TABLE_USER_FD)->GET($userId);
+        if (!$fd) {
+            return false;
+        }
+        if (empty(self::$_instances[$fd])) {
+            return false;
         }
         return self::$_instances[$fd];
     }
@@ -34,7 +47,6 @@ class Client
 
     public function sessionStart()
     {
-
     }
 
     public function getFd()
@@ -45,6 +57,18 @@ class Client
     public function onClose()
     {
         unset(Client::$_instances[$this->fd]);
+        if ($this->userId) {
+            \Mogic\Memo::getInstance()->table(MEMO_TABLE_USER_FD)->DEL($this->userId);
+        }
+    }
+
+    public function bind($userId)
+    {
+        $this->userId = $userId;
+        \Mogic\Memo::getInstance()->table(MEMO_TABLE_USER_FD)->SET($userId, array(
+            'fd'  =>$this->fd,
+            'endtime'  =>time()+3600,
+        ));
     }
 
     public function send($data)
@@ -75,6 +99,7 @@ class Client
         $request = new \Mogic\Request($route, $params, function ($err, $response) use ($callback) {
             call_user_func($callback, $err, $response);
         });
+        $request->client = $this;
         \Mogic\Application::getInstance()->run($request);
     }
 

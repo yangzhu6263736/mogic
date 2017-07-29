@@ -7,9 +7,8 @@
  */
 $config['Memo'] = array(
     MEMO_TABLE_USER_FD    =>  array(
-        'size'  =>  1024,
+        'size'  =>  262144,
         'columns'    =>  array(
-            array('userId', \swoole\table::TYPE_INT, 10),
             array('fd', \swoole\table::TYPE_INT, 10),
             array('endtime',  \swoole\table::TYPE_INT, 10)
         )

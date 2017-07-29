@@ -2,6 +2,7 @@
 /**
  * MOG的session类
  *  数据存储交由redis
+ *  
  */
 namespace Mogic;
 
@@ -11,6 +12,7 @@ class Session
 
     public $session_id = '';
     private $updateTime;
+    private $expireTime;
     private $di;//数据容器
 
     /**
@@ -40,6 +42,7 @@ class Session
         if (empty(self::$_instances[$session_id])) {
             new Session($session_id);
         }
+        self::$_instances[$session_id]->expire();
         return self::$_instances[$session_id];
     }
 
@@ -47,6 +50,7 @@ class Session
     {
         $this->session_id = $session_id;
         self::$_instances[$session_id] = $this;
+        $this->expire();
     }
 
     /**
@@ -61,14 +65,31 @@ class Session
         list($_GID, $mtime, $rand) = \explode('-', $session_id);
         return $GID !== $_GID;
     }
+
+    /**
+     * 更新过期时间
+     *
+     * @return void
+     */
+    public function expire()
+    {
+        if (time() - $this->updateTime < 120) {//防止频繁更新过期时间
+            return;
+        }
+        $this->updateTime = time();
+        $this->expireTime = time() + 1800;
+        RedisPools::pool(REDIS_GROUP_SESSION)->expire($this->session_id, 1800, \json_encode($this->di), function (\swoole_redis $client, $result) {
+        });
+    }
     
     /**
      * 将数据推送到远端
      *
      * @return void
      */
-    public function pull()
+    public function push()
     {
+        MLog::log("session push");
         RedisPools::pool(REDIS_GROUP_SESSION)->set($this->session_id, \json_encode($this->di), function (\swoole_redis $client, $result) {
         });
     }
@@ -83,6 +104,7 @@ class Session
         // if ($this->isLocal) {//如果是本地session
         //     return call_user_func($next, $this);
         // }
+        MLog::log("session fetch");
         RedisPools::pool(REDIS_GROUP_SESSION)->get($this->session_id, function (\swoole_redis $client, $result) use ($next) {
             if ($result !== false) {
                 $this->di = \json_decode($result, true);

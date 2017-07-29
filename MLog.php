@@ -1,6 +1,12 @@
 <?php
 namespace Mogic;
 
+require_once("library/Colors.php");
+define('COLOR_RED', 'red');
+define('COLOR_PURPLE', 'purple');
+define('COLOR_BLUE', 'blue');
+define('COLOR_YELLOW', 'yellow');
+define('COLOR_GRAY', 'light_gray');
 class MLog
 {
     public static $workerId = 0;
@@ -16,6 +22,21 @@ class MLog
         $msg = self::merge($args);
         \SeasLog::info($msg);
         echo $msg."\n";
+    }
+
+    /**
+     * 输出带颜色的文字 便于调试
+     *
+     * @param [type] $color
+     * @param [type] ...$args
+     * @return void
+     */
+    public static function clog($color, ...$args)
+    {
+        $msg = self::merge($args);
+        \SeasLog::info($msg);
+        $colors = new \Wujunze\Colors();
+        echo $colors->getColoredString($msg, $color).PHP_EOL;
     }
 
     // public static function info(...$args){
