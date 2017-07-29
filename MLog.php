@@ -27,7 +27,7 @@ class MLog
     /**
      * 输出带颜色的文字 便于调试
      *
-     * @param [type] $color
+     * @param [type] $color 
      * @param [type] ...$args
      * @return void
      */
