@@ -39,6 +39,10 @@ class MLog
         echo $colors->getColoredString($msg, $color).PHP_EOL;
     }
 
+    public static function cwarn($color, ...$args)
+    {
+        self::clog($color, $args);
+    }
     // public static function info(...$args){
     // 	$msg = self::merge($args);
     // 	SeasLog::log($msg);
