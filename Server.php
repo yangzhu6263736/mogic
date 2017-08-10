@@ -6,7 +6,7 @@ namespace Mogic;
 class Server
 {
     private static $_instance;
-    private $swooleServer;
+    public $swooleServer;
     private $application;
     private $redis;
     public $memtable;
@@ -35,38 +35,39 @@ class Server
     public function creatTable()
     {
         \Mogic\Memo::getInstance()->create();
-        \Mogic\Memo::getInstance()->test();
-        \Mogic\Memo::getInstance()->table(MEMO_TABLE_USERS)->SET(100, array(
-            'userId'=>1,
-            'name'  =>'yangzhu',
-            'coin'  =>100,
-        ));
+        // \Mogic\Memo::getInstance()->test();
+        // \Mogic\Memo::getInstance()->table(MEMO_TABLE_USERS)->SET(100, array(
+        //     'userId'=>1,
+        //     'name'  =>'yangzhu',
+        //     'coin'  =>100,
+        // ));
     }
 
     public function sendToFd($fd, $data)
     {
         echo "Server pushToFd $fd $data";
+        \Mogic\MLog::clog(COLOR_RED, 'send to fd', $fd, $data);
         $this->swooleServer->push($fd, $data);
     }
 
-    public function sendToUser($userId, $data)
-    {
-        $this->userId = $userId;
-        $fd = \Mogic\Memo::getInstance()->table(MEMO_TABLE_USER_FD)->GET($userId);
-        if (!$fd) {
-            #@todo '分布式rpc'
-            return;
-        }
-        $this->pushToFd($fd, $data);
-    }
+    // public function sendToUser($userId, $data)
+    // {
+    //     $this->userId = $userId;
+    //     $fd = \Mogic\Memo::getInstance()->table(MEMO_TABLE_USER_FD)->GET($userId);
+    //     if (!$fd) {
+    //         #@todo '分布式rpc'
+    //         return;
+    //     }
+    //     $this->pushToFd($fd, $data);
+    // }
 
     public function initSwooleServer()
     {
         // $this->swooleServer = new \Swoole\Http\Server("localhost", 3736, SWOOLE_PROCESS);
         $this->swooleServer = new \Swoole\Websocket\Server("localhost", 3736, SWOOLE_PROCESS);
         $this->swooleServer->set(array(
-            'worker_num' => 1,
-            'dispatch_mode'    =>    4,//与worker通信模式 1轮询 2 描述符固定 3 抢占 4 IP分配 5 UID分配
+            'worker_num' => 3,
+            'dispatch_mode'    =>    5,//与worker通信模式 1轮询 2 描述符固定 3 抢占 4 IP分配 5 UID分配
             'heartbeat_check_interval' => 10,
                 'heartbeat_idle_time' => 15,
                 'open_eof_check'    => 1,//拆包 用
@@ -163,36 +164,78 @@ class Server
     {
     }
 
+    /**
+     * http请求响应
+     *
+     * @param [type] $request
+     * @param [type] $response
+     * @return void
+     */
     public function onRequest($request, $response)
     {
-        $_GET['_url'] = $request->server['request_uri'];
-        if ($request->server['request_method'] == 'GET' && isset($request->get)) {
-            foreach ($request->get as $key => $value) {
-                $_GET[$key] = $value;
-                $_REQUEST[$key] = $value;
-            }
+        // $_GET['_url'] = $request->server['request_uri'];
+        // if ($request->server['request_method'] == 'GET' && isset($request->get)) {
+        //     foreach ($request->get as $key => $value) {
+        //         $_GET[$key] = $value;
+        //         $_REQUEST[$key] = $value;
+        //     }
+        // }
+        // if ($request->server['request_method'] == 'POST' && isset($request->post)) {
+        //     foreach ($request->post as $key => $value) {
+        //         $_POST[$key] = $value;
+        //         $_REQUEST[$key] = $value;
+        //     }
+        // }
+        // print_R($request);
+    
+        $route = $request->server['request_uri'];
+        if ($route == '/favicon.ico') {
+            $response->end();
+            return;
         }
-        if ($request->server['request_method'] == 'POST' && isset($request->post)) {
-            foreach ($request->post as $key => $value) {
-                $_POST[$key] = $value;
-                $_REQUEST[$key] = $value;
-            }
-        }
-        $session_id = empty($request->cookie['MOGIC_SESSION_ID']) ? '' : $request->cookie['MOGIC_SESSION_ID'];
-        $_SESSION = \Mogic\Session::getInstance($session_id);
-        $res = \Mogic\YafInterface::request('index', 'index');
-        $response->cookie("MOGIC_SESSION_ID", $_SESSION->get('session_id'));
-        $response->cookie("User", "Swoole");
-        $response->header("X-Server", "Swoole");
+        $route = substr($route, 1);
+        MLog::clog(COLOR_YELLOW, $route);
+        // $route = str_replace(' ', '\/', trim(str_replace('\/', ' ', $route)));
+        // $route = 'hall/hall/enter';
+        $params = empty($request->get) ? array() : $request->get;
+
+        $fd = $request->fd;
+        $client = new Client($fd, false);
+        $client->onRequest($route, $params, function ($err, $res) use ($response, $client) {
+            $response->header('Access-Control-Allow-Origin', "*");//跨域
+            $response->header('Access-Control-Allow-Methods', 'POST,GET,OPTIONS,DELETE');
+            $response->header('Access-Control-Allow-Headers', 'x-requested-with,content-type');
+            $response->end(json_encode(array($err, $res)));
+            $client->removeSelf();
+        });
+
+        // \Mogic\MLog::clog("GREEN", $route);
+        // \Mogic\MLog::log($route, $params);
+        // $request = new \Mogic\Request($route, $params, function ($err, $response) use ($callback) {
+        //     call_user_func($callback, $err, $response);
+        // });
+        // $request->client = $this;
+        // \Mogic\Application::getInstance()->run($request);
+        // $session_id = empty($request->cookie['MOGIC_SESSION_ID']) ? '' : $request->cookie['MOGIC_SESSION_ID'];
+        // $_SESSION = \Mogic\Session::getInstance($session_id);
+        // $res = \Mogic\YafInterface::request('index', 'index');
+        // $response->cookie("MOGIC_SESSION_ID", $_SESSION->get('session_id'));
+        // $res = 'hello world!';
+        // $response->cookie("User", "Swoole");
+        // $response->header("X-Server", "Swoole");
         // $response->end("<h1>".$res."</h1>");
-        $response->end($res);
+        // \Mogic\MLog::log($route, $params);
+        // $request = new \Mogic\Request($route, $params, function ($err, $res) use ($response) {
+        //     // call_user_func($callback, $err, $res);
+        //     $response->end($err.$res);
+        // });
+        // \Mogic\Application::getInstance()->run($request);
     }
 
     public function _onMessage($server, $frame)
     {
         // print_r($frame);
-        echo "_onMessage:  $server->worker_pid\n";
-        echo "Server:onMessage:$frame->fd\n";
+        \Mogic\MLog::clog("BLUE", "Server:onMessage:$frame->fd", $server->worker_pid);
         $fd = $frame->fd;
         $client = Client::getClient($fd);
         Protocal::unpack($frame->data, function ($package) use ($client) {

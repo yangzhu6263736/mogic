@@ -2,7 +2,7 @@
 /**
  * MOG的session类
  *  数据存储交由redis
- *  
+ *
  */
 namespace Mogic;
 
@@ -106,11 +106,16 @@ class Session
         // }
         MLog::log("session fetch");
         RedisPools::pool(REDIS_GROUP_SESSION)->get($this->session_id, function (\swoole_redis $client, $result) use ($next) {
-            if ($result !== false) {
+            \Mogic\MLog::clog("red", "fetch back", $result);
+            if (!is_null($result)) {
                 $this->di = \json_decode($result, true);
-            }
-            if ($next) {
-                call_user_func($next, false, $this);
+                if ($next) {
+                    call_user_func($next, false, $this);
+                }
+            } else {
+                if ($next) {
+                    call_user_func($next, ERROR_USER_NOT_LOGIN);
+                }
             }
         });
     }

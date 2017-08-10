@@ -46,4 +46,53 @@ class Utils
             self::asyncCalls($funcs, $params);
         });
     }
+
+    public static function tree($path)
+    {
+        $mydir = dir($path);
+        $array = array();
+        // echo $path."\n";
+        while ($file = $mydir->read()) {
+            $_file = $path."/".$file;
+            if ($file == ".") {
+                continue;
+            }
+            if ($file == "..") {
+                continue;
+            }
+            if (is_dir($_file)) {
+                $array[$file] = self::tree($_file);
+            } else {
+                if (\strstr($file, '.DS_Store')) {
+                    continue;
+                }
+                $array[] = $file;
+            }
+        }
+        $mydir->close();
+        return $array;
+    }
+
+    /**
+     * 取得某个API文件的详情
+     *      利用反射API获取php类文件的所有接口详细信息
+     * @param [type] $route
+     * @return void
+     */
+    public static function getApiDetail($file, $class)
+    {
+        include_once($file);
+        $detail = array();
+        $reflection = new \ReflectionClass($class);
+        // $doc = $reflection->getDocComment();
+        include_once(MOG_PATH.'library/vendor/autoload.php');
+        $classReflection = new \Nette\Reflection\ClassType($class);
+        $detail['class'] = $classReflection->getAnnotations();
+        $methods = $classReflection->getMethods();
+        foreach ($methods as $method) {
+            $name = $method->name;
+            $detail['methods'][$name] = $method->getAnnotations();
+        }
+        return $detail;
+    }
 }

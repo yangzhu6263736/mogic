@@ -7,33 +7,69 @@ class Client
 {
     private static $_instances;
     public $fd;
+    public $isSocketFd;//是否是websocket句柄
     public $userId;
     public $session;
     public static function getClient($fd)
     {
         if (empty(self::$_instances[$fd])) {
-            return false;
+            // return false;
+            new Client($fd);
         }
         return self::$_instances[$fd];
     }
 
     public static function getClientByUserId($userId)
     {
-        $fd = \Mogic\Memo::getInstance()->table(MEMO_TABLE_USER_FD)->GET($userId);
-        if (!$fd) {
+        $userCell = \Mogic\Memo::getInstance()->table(MEMO_TABLE_USER_FD)->GET($userId);
+        if (empty($userCell)) {
             return false;
         }
+        $fd = $userCell['fd'];
         if (empty(self::$_instances[$fd])) {
             return false;
         }
         return self::$_instances[$fd];
     }
 
-    public function __construct($fd)
+    /**
+     * 移除当前进程持有的client
+     * 移除client并不会造成客户端断开 仅为移除当前进程的client实例
+     *
+     * @param [type] $fd
+     * @return void
+     */
+    public static function removeClient($fd)
+    {
+        unset(self::$_instances[$fd]);
+    }
+
+    /**
+     * 向指定用户推送 事件
+     *
+     * @param [type] $userId
+     * @param [type] $data
+     * @return void
+     */
+    public static function emitUser($userId, $eventname, $params)
+    {
+        $client = self::getClientByUserId($userId);
+        if (!$client) {
+            return false;
+        }
+        $client->emitClient($eventname, $params);
+    }
+
+    public function __construct($fd, $isSocketFd = true)
     {
         echo "新的用户:".$fd."\n";
         \SeasLog::info('新的用户'.$fd);
+        print_R(self::$_instances);
+        if (isset(self::$_instances[$fd])) {
+            throw new Exception("已存在的client");
+        }
         self::$_instances[$fd] = $this;
+        $this->isSocketFd = $isSocketFd;
         $this->fd = $fd;
         $this->onConnect();
     }
@@ -62,6 +98,12 @@ class Client
         }
     }
 
+    /**
+     * 针客户端绑定用户 用于向指定用户推送信息
+     *  存放在内存表 同组worker可跨进程共享
+     * @param [type] $userId
+     * @return void
+     */
     public function bind($userId)
     {
         $this->userId = $userId;
@@ -71,31 +113,52 @@ class Client
         ));
     }
 
+    public function removeSelf()
+    {
+        self::removeClient($this->fd);
+    }
+
+    /**
+     * 绑定句柄分配依据
+     *      uid  roomid
+     * 用于让master进程将请求分发到不同的worker进程
+     *      仅当dispatch_mode为5时可设置
+     *      可用于将同一房间(同一服)的玩家请求分发到同一进程
+     *
+     * @param [type] $dispatchId
+     * @return void
+     */
+    public function bindDispatch($dispatchId)
+    {
+        \Mogic\Server::getInstance()->swooleServer->bind($this->fd, $dispatchId);
+        swoole_timer_after(1, function () {//绑定分发ID后可能造成该fd的响应不会派发到当前进程 因此移除这个client对像
+            self::removeClient($this->fd);
+        });
+    }
+
+
     public function send($data)
     {
-        Server::getInstance()->sendToFd($this->fd, $data);
+        if ($this->isSocketFd) {//如果是http请求 则不允许推送
+            Server::getInstance()->sendToFd($this->fd, $data);
+        }
         // $server->push($frame->fd, json_encode(["hello", "world"]));
     }
 
     public function push($eventname, $params)
     {
-        $_rep = array($eventname, $params);
-        $message = Message::getMessage(Message_TYPE_PUSH, $_rep, false);
-        $package = Package::getPackage(Package_TYPE_DATA, $message);
-        $pack = Protocal::encode($package);
-        var_dump($pack);
+        $pack = \Mogic\Protocal::getPushPack($eventname, $params);
         $this->send($pack);
+    }
+
+    public function emitClient($eventname, $params)
+    {
+        $this->push($eventname, $params);
     }
 
     public function onRequest($route, $params, $callback)
     {
-        \Mogic\MLog::log($route, $params);
-        // $err = false;
-        // $res = array("fuck response");
-        // $routes = explode('/', $route);
-        // list($module, $controller, $action) = $routes;
-        // $res = YafInterface::request($module, $controller, $action, $params, $this);
-        // call_user_func($callback, $err, $res);
+        \Mogic\MLog::clog("red", $route, $params);
         $request = new \Mogic\Request($route, $params, function ($err, $response) use ($callback) {
             call_user_func($callback, $err, $response);
         });
@@ -114,21 +177,21 @@ class Client
             list($packageType, $message) = $package;
         }
         switch ($packageType) {
-            case Package_TYPE_HANDSHAKE:
+            case PACKAGE_TYPE_HANDSHAKE:
                 break;
-            case Package_TYPE_HANDSHAKE_ACK:
+            case PACKAGE_TYPE_HANDSHAKE_ACK:
                 break;
-            case Package_TYPE_HEARTBEAT:
-                // echo "client:Package_TYPE_HEARTBEAT";
-                $package = Package::getPackage(Package_TYPE_HEARTBEAT);
+            case PACKAGE_TYPE_HEARTBEAT:
+                // echo "client:PACKAGE_TYPE_HEARTBEAT";
+                $package = Package::getPackage(PACKAGE_TYPE_HEARTBEAT);
                 $pack = Protocal::encode($package);
                 // var_dump($pack);
                 $this->send($pack);
                 break;
-            case Package_TYPE_DATA:
+            case PACKAGE_TYPE_DATA:
                 $this->onMessage($message);
                 break;
-            case Package_TYPE_KICK:
+            case PACKAGE_TYPE_KICK:
                 break;
             default:
                 # code...
@@ -147,22 +210,18 @@ class Client
             list($messageType, $data, $addition) = $message;
         }
         switch ($messageType) {
-            case Message_TYPE_REQUEST:
+            case MESSAGE_TYPE_REQUEST:
                 list($route, $params) = $data;
-                $this->onRequest($route, $params, function ($_err, $_rep) use ($addition) {
-                    $rep = array($_err, $_rep);
-                    $message = Message::getMessage(Message_TYPE_RESPONSE, $rep, $addition);
-                    $package = Package::getPackage(Package_TYPE_DATA, $message);
-                    $pack = Protocal::encode($package);
-                    var_dump($pack);
+                $this->onRequest($route, $params, function ($err, $res) use ($addition) {
+                    $pack = \Mogic\Protocal::getResponsePack($err, $res, $addition);
                     $this->send($pack);
                 });
                 break;
-            case Message_TYPE_NOTIFY:
+            case MESSAGE_TYPE_NOTIFY:
                 break;
-            case Message_TYPE_RESPONSE:
+            case MESSAGE_TYPE_RESPONSE:
                 break;
-            case Message_TYPE_PUSH:
+            case MESSAGE_TYPE_PUSH:
                 break;
             default:
                 # code...

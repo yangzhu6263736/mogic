@@ -1,16 +1,16 @@
 <?php
 namespace Mogic;
 
-define('Package_TYPE_HANDSHAKE', 1);
-define('Package_TYPE_HANDSHAKE_ACK', 2);
-define('Package_TYPE_HEARTBEAT', 3);
-define('Package_TYPE_DATA', 4);
-define('Package_TYPE_KICK', 5);
+define('PACKAGE_TYPE_HANDSHAKE', 1);
+define('PACKAGE_TYPE_HANDSHAKE_ACK', 2);
+define('PACKAGE_TYPE_HEARTBEAT', 3);
+define('PACKAGE_TYPE_DATA', 4);
+define('PACKAGE_TYPE_KICK', 5);
 
-define('Message_TYPE_REQUEST', 0);
-define('Message_TYPE_NOTIFY', 1);
-define('Message_TYPE_RESPONSE', 2);
-define('Message_TYPE_PUSH', 3);
+define('MESSAGE_TYPE_REQUEST', 0);
+define('MESSAGE_TYPE_NOTIFY', 1);
+define('MESSAGE_TYPE_RESPONSE', 2);
+define('MESSAGE_TYPE_PUSH', 3);
 
 class Protocal
 {
@@ -18,7 +18,7 @@ class Protocal
      * 先采用\r\n拆包
      * swoole server 设置了
      *open_eof_check=> 1,//拆包 用
-     *'package_eof' => "\r\n", //设置EOF
+     *'PACKAGE_eof' => "\r\n", //设置EOF
     * 会自动用\r\n拆包 但是如果同时传送多个包还需要自已再拆分
     * @param  [type] $message  [description]
     * @param  [type] $callback [description]
@@ -40,6 +40,39 @@ class Protocal
     public static function encode($data)
     {
         return json_encode($data)."\r\n";
+    }
+
+    /**
+     * 取得Push推送的数据包
+     *
+     * @param [type] $eventName
+     * @param [type] $params
+     * @return void
+     */
+    public static function getPushPack($eventName, $params)
+    {
+        $_rep = array($eventName, $params);
+        $message = Message::getMessage(MESSAGE_TYPE_PUSH, $_rep, false);
+        $package = Package::getPackage(PACKAGE_TYPE_DATA, $message);
+        $pack = Protocal::encode($package);
+        return $pack;
+    }
+
+    /**
+     * 取得response数据包
+     *
+     * @param [type] $err 是否发生错误
+     * @param [type] $res 返回内容
+     * @param [type] $handleId 前端回调id
+     * @return void
+     */
+    public static function getResponsePack($err, $res, $handleId)
+    {
+        $rep = array($err, $res);
+        $message = Message::getMessage(MESSAGE_TYPE_RESPONSE, $rep, $handleId);
+        $package = Package::getPackage(PACKAGE_TYPE_DATA, $message);
+        $pack = Protocal::encode($package);
+        return $pack;
     }
 }
 

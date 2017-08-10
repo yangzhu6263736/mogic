@@ -46,10 +46,16 @@ class Request
      */
     public function done($err = false, $msg = "")
     {
+        MLog::clog("red", "request done");
         if ($err) {
             call_user_func($this->callback, $err, $msg);
         } else {
             call_user_func($this->callback, false, $this->response->out());
         }
+    }
+
+    public function err($code, $msg = "")
+    {
+        call_user_func($this->callback, $code, $msg);
     }
 }
