@@ -14,5 +14,11 @@ $config['Redis'] = array(
         'port'  =>  6379,
         'dbid'  => 0,
         'poolSize'  =>2//连接池最大实例数
+    ),
+    REDIS_GROUP_ROOM  =>  array(
+        'host'  =>  '127.0.0.1',
+        'port'  =>  6379,
+        'dbid'  => 11,
+        'poolSize'  =>2//连接池最大实例数
     )
 );

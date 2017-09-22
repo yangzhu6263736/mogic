@@ -11,25 +11,27 @@ namespace Mogic;
 // include(BASE_PATH."/Mogic/Session.php");
 class BaseService
 {
-    public static $instance;
+    public static $instances;
     private $di = array();//数据容器
 
     public static function getInstance()
     {
         $cName = get_called_class();
-        if (!$cName::$instance) {
+        \Mogic\MLog::clog("blue", $cName);
+        if (empty(self::$instances[$cName])) {
             new $cName;
         }
-        return $cName::$instance;
+        return self::$instances[$cName];
     }
 
     public function __construct()
     {
         $cName = get_called_class();
-        if ($cName::$instance) {
+        if (isset(self::$instances[$cName])) {
             throw new \Exception("单例模式已存在, 不能重复创建。使用 xxxMO::getInstance()获取");
         }
-        $cName::$instance = $this;
+        self::$instances[$cName] = $this;
+        // $cName::$instance = $this;
     }
 
     public function __get($name)

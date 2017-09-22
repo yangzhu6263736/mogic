@@ -29,7 +29,7 @@ class Server
         echo "worker进程启动";
         self::$_instance = $this;
         $this->creatTable();
-        $this->initSwooleServer();
+        $this->initSwooleServer($host, $port);
     }
 
     public function creatTable()
@@ -45,8 +45,8 @@ class Server
 
     public function sendToFd($fd, $data)
     {
-        echo "Server pushToFd $fd $data";
-        \Mogic\MLog::clog(COLOR_RED, 'send to fd', $fd, $data);
+        // echo "Server pushToFd $fd $data";
+        // \Mogic\MLog::clog(COLOR_RED, 'send to fd', $fd, $data);
         $this->swooleServer->push($fd, $data);
     }
 
@@ -61,10 +61,10 @@ class Server
     //     $this->pushToFd($fd, $data);
     // }
 
-    public function initSwooleServer()
+    public function initSwooleServer($host, $port)
     {
         // $this->swooleServer = new \Swoole\Http\Server("localhost", 3736, SWOOLE_PROCESS);
-        $this->swooleServer = new \Swoole\Websocket\Server("localhost", 3736, SWOOLE_PROCESS);
+        $this->swooleServer = new \Swoole\Websocket\Server($host, $port, SWOOLE_PROCESS);
         $this->swooleServer->set(array(
             'worker_num' => 3,
             'dispatch_mode'    =>    5,//与worker通信模式 1轮询 2 描述符固定 3 抢占 4 IP分配 5 UID分配
@@ -101,7 +101,7 @@ class Server
             }
         });
         $this->swooleServer->on('ManagerStart', function ($serv) {
-            \Mogic\MLog::log("on ManagerStart");
+            // \Mogic\MLog::log("on ManagerStart");
             swoole_set_process_name("phpJoySwoole Manager Porcess");
         });
         $this->swooleServer->on('WorkerStop', function ($serv) {
@@ -235,7 +235,7 @@ class Server
     public function _onMessage($server, $frame)
     {
         // print_r($frame);
-        \Mogic\MLog::clog("BLUE", "Server:onMessage:$frame->fd", $server->worker_pid);
+        // \Mogic\MLog::clog("BLUE", "Server:onMessage:$frame->fd", $server->worker_pid);
         $fd = $frame->fd;
         $client = Client::getClient($fd);
         Protocal::unpack($frame->data, function ($package) use ($client) {
@@ -262,7 +262,7 @@ class Server
 
     public function onWorkerStart()
     {
-        \Mogic\MLog::log("on onWorkerStart");
+        // \Mogic\MLog::log("on onWorkerStart");
         swoole_set_process_name("php Mogic worker");
    
         RedisPools::pool(REDIS_GROUP_MOG)->set('key', "fuck", function (\swoole_redis $client, $result) {

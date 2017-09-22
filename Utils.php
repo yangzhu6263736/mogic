@@ -38,6 +38,9 @@ class Utils
         if (!$func) {
             return;
         }
+        if (\count($funcs) == 0) {
+            return call_user_func($func, false, $params);
+        }
         call_user_func($func, $params, function ($err, $params) use ($funcs) {
             if ($err) {
                 $finalFunc = array_pop($funcs);

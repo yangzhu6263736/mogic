@@ -62,9 +62,9 @@ class Client
 
     public function __construct($fd, $isSocketFd = true)
     {
-        echo "新的用户:".$fd."\n";
+        // echo "新的用户:".$fd."\n";
         \SeasLog::info('新的用户'.$fd);
-        print_R(self::$_instances);
+        // print_R(self::$_instances);
         if (isset(self::$_instances[$fd])) {
             throw new Exception("已存在的client");
         }
